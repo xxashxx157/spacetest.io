@@ -1,0 +1,755 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spacetest.io</title>
+
+<style>
+body{
+margin:0;
+overflow:hidden;
+background:black;
+font-family:Arial;
+color:white;
+}
+
+canvas{
+display:block;
+}
+
+.panel{
+position:fixed;
+top:10px;
+right:10px;
+background:rgba(0,0,0,.75);
+padding:10px;
+border-radius:10px;
+z-index:10;
+width:220px;
+}
+
+.info{
+position:fixed;
+bottom:10px;
+left:10px;
+background:rgba(0,0,0,.7);
+padding:8px;
+border-radius:8px;
+font-size:13px;
+z-index:10;
+}
+
+select,input{
+width:100%;
+margin-top:5px;
+}
+
+#menuBtn{
+position:fixed;
+top:10px;
+left:10px;
+z-index:20;
+padding:10px 15px;
+border:none;
+border-radius:10px;
+background:#111;
+color:white;
+cursor:pointer;
+}
+
+#spaceMenu{
+position:fixed;
+left:10px;
+top:60px;
+width:260px;
+height:500px;
+overflow:auto;
+background:rgba(0,0,0,.92);
+border-radius:15px;
+padding:10px;
+display:none;
+z-index:20;
+}
+
+#search{
+width:100%;
+padding:8px;
+margin-bottom:10px;
+background:#111;
+color:white;
+border:1px solid #444;
+border-radius:8px;
+box-sizing:border-box;
+}
+
+.objectItem{
+padding:10px;
+margin-bottom:6px;
+background:#111;
+border-radius:10px;
+cursor:pointer;
+transition:.2s;
+}
+
+.objectItem:hover{
+background:#222;
+}
+
+.copyright{
+position:fixed;
+bottom:10px;
+right:10px;
+font-size:12px;
+opacity:.7;
+z-index:30;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="canvas"></canvas>
+
+<button id="menuBtn">☰ Space Objects</button>
+
+<div id="spaceMenu">
+<input type="text" id="search" placeholder="Search objects...">
+<div id="objectList"></div>
+</div>
+
+<div class="panel">
+
+Body Type
+<select id="type">
+<option value="star">Star</option>
+<option value="giant">Red Giant</option>
+<option value="pulsar">Pulsar</option>
+<option value="dwarf">White Dwarf</option>
+<option value="gas">Gas Planet</option>
+<option value="rock">Rock Planet</option>
+<option value="diamond">Methane Planet</option>
+<option value="water">Water Planet</option>
+<option value="moon">Moon</option>
+<option value="ice">ice Planet</option>
+<option value="blackhole">Black Hole</option>
+<option value="whitehole">White Hole</option>
+</select>
+
+<br><br>
+
+Mass
+<input id="mass" type="range" min="20" max="1200" value="200">
+
+<br><br>
+
+Speed
+<input id="speed" type="range" min="0" max="8" step="0.1" value="1.5">
+
+<br><br>
+
+Gravity
+<input id="gravity" type="range" min="0.01" max="1" step="0.01" value="0.05">
+
+</div>
+
+<div class="info">
+Arrow Keys = Move Camera 🚀<br>
+T = Toggle Heat Effects 🔥
+</div>
+
+<div class="copyright">
+All Rights Reserved in 2026 © Xx ash xX CO.
+</div>
+
+<script>
+
+const canvas=document.getElementById("canvas")
+const ctx=canvas.getContext("2d")
+
+function resize(){
+canvas.width=innerWidth
+canvas.height=innerHeight
+}
+
+resize()
+window.onresize=resize
+
+const bodies=[]
+const stars=[]
+let particles=[]
+
+const camera={
+x:0,
+y:0,
+speed:20
+}
+
+const keys={}
+let heatEffects=true
+
+window.onkeydown=e=>{
+
+keys[e.key]=true
+
+if(e.key.toLowerCase()=="t"){
+heatEffects=!heatEffects
+}
+
+}
+
+window.onkeyup=e=>keys[e.key]=false
+
+/* نجوم الخلفية */
+
+for(let i=0;i<70000;i++){
+
+stars.push({
+x:(Math.random()-0.5)*25000,
+y:(Math.random()-0.5)*25000,
+r:Math.random()*2.5,
+alpha:Math.random()*0.8+0.2
+})
+
+}
+
+class Body{
+
+constructor(x,y,mass,type){
+
+this.x=x
+this.y=y
+this.mass=mass
+this.type=type
+
+this.vx=(Math.random()-.5)*speed.value
+this.vy=(Math.random()-.5)*speed.value
+
+this.radius=Math.sqrt(mass)
+
+this.temperature=
+type=="star" ? 5500 :
+type=="giant" ? 3500 :
+type=="pulsar" ? 1000000 :
+type=="dwarf" ? 10 :
+type=="gas" ? -120 :
+type=="rock" ? 40 :
+type=="moon" ? -20 :
+type=="ice" ? -80 :
+type=="diamond" ? -180 :
+type=="water" ? 15 :
+type=="blackhole" ? 9999999 :
+type=="whitehole" ? 12000 :
+0
+
+this.color=
+type=="star"?"#ffd700":
+type=="giant"?"#ff3300":
+type=="pulsar"?"#bb66ff":
+type=="dwarf"?"brown":
+type=="gas"?"#cfa15a":
+type=="rock"?"#4d79ff":
+type=="moon"?"gray":
+type=="ice"?"white":
+type=="diamond"?"#66ffee":
+type=="water"?"#44bbff":
+type=="blackhole"?"#111":
+type=="whitehole"?"#fff":
+"#888"
+
+}
+
+update(){
+
+const G=parseFloat(gravity.value)
+
+for(let other of bodies){
+
+if(other===this) continue
+
+const dx=other.x-this.x
+const dy=other.y-this.y
+
+const d=Math.hypot(dx,dy)+0.1
+
+/* حرارة من النجوم */
+
+if(other.type=="star" || other.type=="giant"){
+
+if(d<500){
+
+this.temperature += 0.5
+
+}
+
+}
+
+
+/* تبريد */
+
+this.temperature -= 0.02
+
+/* اصطدام */
+
+if(d<this.radius+other.radius){
+
+this.temperature += other.mass*0.3
+
+this.temperature += other.temperature *0.1
+
+createExplosion(this.x,this.y)
+
+this.mass+=other.mass *0.7
+this.radius=Math.sqrt(this.mass)
+
+bodies.splice(bodies.indexOf(other),1)
+
+continue
+
+}
+
+const force=G*this.mass*other.mass/(d*d)
+
+this.vx+=force*dx/d/this.mass
+this.vy+=force*dy/d/this.mass
+
+}
+
+this.x+=this.vx
+this.y+=this.vy
+
+}
+
+draw(){
+
+const sx=this.x-camera.x
+const sy=this.y-camera.y
+
+ctx.shadowBlur=20
+ctx.shadowColor=this.color
+
+ctx.beginPath()
+ctx.arc(sx,sy,this.radius,0,Math.PI*2)
+ctx.fillStyle=this.color
+ctx.fill()
+
+ctx.shadowBlur=0
+
+/* حلقات غاز */
+
+if(this.type=="gas"){
+
+ctx.beginPath()
+
+ctx.ellipse(
+sx,
+sy,
+this.radius*1.8,
+this.radius*.6,
+0,
+0,
+Math.PI*2
+)
+
+ctx.strokeStyle="rgba(255,255,255,.4)"
+ctx.stroke()
+
+}
+
+/* ثقب أسود */
+
+if(this.type=="blackhole"){
+
+ctx.beginPath()
+
+ctx.arc(
+sx,
+sy,
+this.radius*1.7,
+0,
+Math.PI*2
+)
+
+ctx.strokeStyle="purple"
+ctx.lineWidth=3
+ctx.stroke()
+
+}
+
+/* تأثيرات الحرارة */
+
+if(heatEffects){
+
+if(this.temperature>200){
+
+ctx.beginPath()
+
+ctx.arc(
+sx,
+sy,
+this.radius*1.15,
+0,
+Math.PI*2
+)
+
+ctx.strokeStyle="orange"
+ctx.lineWidth=3
+ctx.stroke()
+
+}
+
+if(this.temperature>1000){
+
+ctx.beginPath()
+
+ctx.arc(
+sx,
+sy,
+this.radius*1.35,
+0,
+Math.PI*2
+)
+
+ctx.strokeStyle="red"
+ctx.lineWidth=4
+ctx.stroke()
+
+ctx.shadowBlur=40
+ctx.shadowColor="red"
+
+ctx.beginPath()
+
+ctx.arc(
+sx,
+sy,
+this.radius*1.1,
+0,
+Math.PI*2
+)
+
+ctx.fillStyle="rgba(255,80,0,.25)"
+ctx.fill()
+
+ctx.shadowBlur=0
+
+}
+
+if(this.temperature>5000){
+
+for(let i=0;i<6;i++){
+
+const angle=Math.PI*2/6*i
+
+ctx.beginPath()
+
+ctx.moveTo(sx,sy)
+
+ctx.lineTo(
+sx+Math.cos(angle)*this.radius,
+sy+Math.sin(angle)*this.radius
+)
+
+ctx.strokeStyle="yellow"
+ctx.lineWidth=2
+ctx.stroke()
+
+}
+
+ctx.beginPath()
+
+ctx.arc(
+sx,
+sy,
+this.radius*1.6,
+0,
+Math.PI*2
+)
+
+ctx.strokeStyle="rgba(255,255,0,.5)"
+ctx.lineWidth=5
+ctx.stroke()
+
+}
+
+if(this.temperature>10000){
+
+ctx.shadowBlur=60
+ctx.shadowColor="white"
+
+ctx.beginPath()
+
+ctx.arc(
+sx,
+sy,
+this.radius*1.8,
+0,
+Math.PI*2
+)
+
+ctx.fillStyle="rgba(255,255,255,.15)"
+ctx.fill()
+
+ctx.shadowBlur=0
+
+}
+
+if(this.temperature<-100){
+
+ctx.beginPath()
+
+ctx.arc(
+sx,
+sy,
+this.radius*1.1,
+0,
+Math.PI*2
+)
+
+ctx.strokeStyle="#88ffff"
+ctx.lineWidth=2
+ctx.stroke()
+
+for(let i=0;i<4;i++){
+
+ctx.beginPath()
+
+ctx.arc(
+sx+(Math.random()-.5)*this.radius,
+sy+(Math.random()-.5)*this.radius,
+this.radius*0.15,
+0,
+Math.PI*2
+)
+
+ctx.fillStyle="rgba(255,255,255,.5)"
+ctx.fill()
+
+}
+
+}
+
+}
+
+/* الحرارة */
+
+ctx.fillStyle="orange"
+ctx.font="12px Arial"
+
+ctx.fillText(
+Math.floor(this.temperature)+"°C",
+sx-this.radius,
+sy+this.radius+15
+)
+
+/* السرعة */
+
+ctx.fillStyle="#44bbff"
+
+ctx.fillText(
+"⚡ "+Math.floor(Math.hypot(this.vx,this.vy)*10),
+sx-this.radius,
+sy+this.radius+30
+)
+
+}
+
+}
+
+function createExplosion(x,y){
+
+for(let i=0;i<35;i++){
+
+particles.push({
+x,y,
+vx:(Math.random()-.5)*10,
+vy:(Math.random()-.5)*10,
+life:100
+})
+
+}
+
+}
+
+function drawParticles(){
+
+for(let p of particles){
+
+p.x+=p.vx
+p.y+=p.vy
+p.life--
+
+ctx.beginPath()
+
+ctx.arc(
+p.x-camera.x,
+p.y-camera.y,
+2,
+0,
+Math.PI*2
+)
+
+ctx.fillStyle="orange"
+ctx.fill()
+
+}
+
+particles=particles.filter(p=>p.life>0)
+
+}
+
+canvas.onclick=e=>{
+
+bodies.push(
+new Body(
+e.clientX+camera.x,
+e.clientY+camera.y,
++mass.value,
+type.value
+)
+)
+
+}
+
+const spaceObjects=[
+{name:"Sun",type:"star",mass:1000},
+{name:"Sirius",type:"star",mass:950},
+{name:"Betelgeuse",type:"giant",mass:1200},
+{name:"Rigel",type:"star",mass:1100},
+{name:"Pulsar X1",type:"pulsar",mass:850},
+{name:"Mercury",type:"rock",mass:80},
+{name:"Venus",type:"rock",mass:130},
+{name:"Earth",type:"water",mass:150},
+{name:"Moon",type:"rock",mass:50},
+{name:"Mars",type:"rock",mass:100},
+{name:"Jupiter",type:"gas",mass:500},
+{name:"Saturn",type:"gas",mass:450},
+{name:"Uranus",type:"gas",mass:300},
+{name:"Neptune",type:"gas",mass:320},
+{name:"Titan",type:"moon",mass:90},
+{name:"Europa",type:"ice",mass:85},
+{name:"Io",type:"rock",mass:75},
+{name:"Pluto",type:"dwarf",mass:60},
+{name:"Methane World",type:"diamond",mass:200},
+{name:"Black Hole GX",type:"blackhole",mass:900}
+]
+
+const menuBtn=document.getElementById("menuBtn")
+const spaceMenu=document.getElementById("spaceMenu")
+const objectList=document.getElementById("objectList")
+const searchInput=document.getElementById("search")
+
+menuBtn.onclick=()=>{
+
+spaceMenu.style.display=
+spaceMenu.style.display=="block"
+?"none":"block"
+
+}
+
+function renderObjects(filter=""){
+
+objectList.innerHTML=""
+
+spaceObjects
+.filter(obj=>obj.name.toLowerCase().includes(filter.toLowerCase()))
+.forEach(obj=>{
+
+const div=document.createElement("div")
+
+div.className="objectItem"
+
+div.innerHTML=`
+<b>${obj.name}</b><br>
+Type: ${obj.type}
+`
+
+div.onclick=()=>{
+
+bodies.push(
+new Body(
+camera.x+canvas.width/2,
+camera.y+canvas.height/2,
+obj.mass,
+obj.type
+)
+)
+
+}
+
+objectList.appendChild(div)
+
+})
+
+}
+
+searchInput.oninput=()=>{
+renderObjects(searchInput.value)
+}
+
+renderObjects()
+
+function loop(){
+
+requestAnimationFrame(loop)
+
+ctx.fillStyle="black"
+ctx.fillRect(0,0,canvas.width,canvas.height)
+
+if(keys["ArrowLeft"]) camera.x-=camera.speed
+if(keys["ArrowRight"]) camera.x+=camera.speed
+if(keys["ArrowUp"]) camera.y-=camera.speed
+if(keys["ArrowDown"]) camera.y+=camera.speed
+
+/* رسم النجوم */
+
+for(let star of stars){
+
+const sx=star.x-camera.x*0.15
+const sy=star.y-camera.y*0.15
+
+if(
+sx<0 || sx>canvas.width ||
+sy<0 || sy>canvas.height
+) continue
+
+ctx.shadowBlur=15
+ctx.shadowColor="white"
+
+ctx.globalAlpha=star.alpha
+
+ctx.beginPath()
+ctx.arc(sx,sy,star.r,0,Math.PI*2)
+ctx.fillStyle="white"
+ctx.fill()
+
+ctx.beginPath()
+
+ctx.moveTo(sx-4,sy)
+ctx.lineTo(sx+4,sy)
+
+ctx.moveTo(sx,sy-4)
+ctx.lineTo(sx,sy+4)
+
+ctx.strokeStyle="rgba(255,255,255,.4)"
+ctx.stroke()
+
+ctx.shadowBlur=0
+ctx.globalAlpha=1
+
+}
+
+for(let body of bodies){
+body.update()
+body.draw()
+}
+
+drawParticles()
+
+}
+
+loop()
+
+</script>
+
+</body>
+</html>
